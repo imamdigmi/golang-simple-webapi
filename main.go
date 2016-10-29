@@ -4,12 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"encoding/xml"
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 
+	"github.com/codegangsta/negroni"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -40,11 +40,22 @@ type ClassifyBooksResponse struct {
 	} `xml:"recommendations>ddc>mostPopular"`
 }
 
+var db *sql.DB
+
+func verifyDatabase(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	if err := db.Ping(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	next(w, r)
+}
+
 func main() {
 	templates := template.Must(template.ParseFiles("templates/index.html"))
-	db, _ := sql.Open("sqlite3", "dev.db")
+	db, _ = sql.Open("sqlite3", "dev.db")
+	mux := http.NewServeMux()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		p := Page{Name: "Gopher"}
 		if name := r.FormValue("query"); name != "" {
 			p.Name = name
@@ -55,7 +66,7 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
 		var results []SearchResult
 		var err error
 		if results, err = search(r.FormValue("search")); err != nil {
@@ -67,13 +78,10 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/books/add", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/books/add", func(w http.ResponseWriter, r *http.Request) {
 		var book ClassifyBooksResponse
 		var err error
 		if book, err = find(r.FormValue("id")); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		if err = db.Ping(); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		_, err = db.Exec("insert into books (pk, title, author, id, classification) values (?, ?, ?, ?, ?)", nil, book.BookData.Title, book.BookData.Author, book.BookData.ID, book.Classification.MostPopular)
@@ -82,7 +90,10 @@ func main() {
 		}
 	})
 
-	fmt.Println(http.ListenAndServe(":8081", nil))
+	n := negroni.Classic()
+	n.Use(negroni.HandlerFunc(verifyDatabase))
+	n.UseHandler(mux)
+	n.Run(":8080")
 }
 
 func find(id string) (ClassifyBooksResponse, error) {
