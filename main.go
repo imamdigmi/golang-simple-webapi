@@ -42,6 +42,12 @@ type ClassifyBooksResponse struct {
 
 var db *sql.DB
 
+var tpl *template.Template
+
+func init() {
+	tpl = template.Must(template.ParseGlob("templates/*.html"))
+}
+
 func verifyDatabase(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	if err := db.Ping(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -51,7 +57,6 @@ func verifyDatabase(w http.ResponseWriter, r *http.Request, next http.HandlerFun
 }
 
 func main() {
-	templates := template.Must(template.ParseFiles("templates/index.html"))
 	db, _ = sql.Open("sqlite3", "dev.db")
 	mux := http.NewServeMux()
 
@@ -61,7 +66,7 @@ func main() {
 			p.Name = name
 		}
 		p.DBStatus = db.Ping() == nil
-		if err := templates.ExecuteTemplate(w, "index.html", p); err != nil {
+		if err := tpl.ExecuteTemplate(w, "index.html", p); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
@@ -93,7 +98,7 @@ func main() {
 	n := negroni.Classic()
 	n.Use(negroni.HandlerFunc(verifyDatabase))
 	n.UseHandler(mux)
-	n.Run(":8080")
+	n.Run(":9000")
 }
 
 func find(id string) (ClassifyBooksResponse, error) {
