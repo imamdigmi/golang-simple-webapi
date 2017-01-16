@@ -40,20 +40,13 @@ type ClassifyBooksResponse struct {
 	} `xml:"recommendations>ddc>mostPopular"`
 }
 
-var db *sql.DB
-
-var tpl *template.Template
+var (
+	db  *sql.DB
+	tpl *template.Template
+)
 
 func init() {
 	tpl = template.Must(template.ParseGlob("templates/*.html"))
-}
-
-func verifyDatabase(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	if err := db.Ping(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	next(w, r)
 }
 
 func main() {
@@ -99,6 +92,14 @@ func main() {
 	n.Use(negroni.HandlerFunc(verifyDatabase))
 	n.UseHandler(mux)
 	n.Run(":9000")
+}
+
+func verifyDatabase(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	if err := db.Ping(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	next(w, r)
 }
 
 func find(id string) (ClassifyBooksResponse, error) {
