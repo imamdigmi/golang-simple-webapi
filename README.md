@@ -1,4 +1,5 @@
 ## Golang simple ajax webapi with Docker
+[![Build Status](https://travis-ci.org/imamdigmi/golang-simple-webapi.svg?branch=master)](https://travis-ci.org/imamdigmi/golang-simple-webapi)
 
 ### Setup
 - Clone source code
